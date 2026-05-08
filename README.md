@@ -1,43 +1,17 @@
 # Album Extractor
 
-把演唱会录音切成规范的专辑曲目。输入一份音频 + 手写时间戳，输出带封面和元数据的 FLAC / ALAC。
+一个 [Claude Code](https://claude.ai/code) skill——把演唱会录音变成规范的专辑曲目。对它说「处理这张专辑」，它搜索官方曲目表、切分音频、嵌入封面和歌词，输出 FLAC + ALAC。
 
 ---
 
 ## 目录
 
-- [解决什么问题](#解决什么问题)
-- [使用场景](#使用场景)
 - [安装](#安装)
-- [快速开始](#快速开始)
-- [命令详解](#命令详解)
-- [Manifest 字段说明](#manifest-字段说明)
-- [作为 Claude Code Skill 使用](#作为-claude-code-skill-使用)
+- [使用](#使用)
+- [原理](#原理)
 - [项目结构](#项目结构)
 - [限制](#限制)
 - [许可证](#许可证)
-
-## 解决什么问题
-
-你有整场演唱会的录音，也手写了每首歌的开始时间，但——
-
-- 曲名是凭记忆写的，不一定对
-- 手动 ffmpeg 切几十首歌太累
-- 切出来的文件没封面、没标签，Apple Music 不认
-
-Album Extractor 把这三件事自动化：**搜索官方曲目表 → 生成可审查的曲目清单 → 一键切分编码**。
-
-## 使用场景
-
-| 场景 | 输入 | 输出 |
-|------|------|------|
-| 无损音频 + 时间戳 → Apple Music | `source.flac` + `timestamps.md` + `cover.jpg` | `ALAC/*.m4a`（带封面，即拖即用） |
-| 无损音频 → 本地存档 | `source.flac` + `timestamps.md` | `tracks/*.flac`（无损，留作母本） |
-| 视频源（蓝光/TS/MKV） | `source.mkv` + `timestamps.md` + `cover.jpg` | 自动提取音频轨 → FLAC + ALAC |
-| 已有歌词想嵌入 | 以上 + 歌词文件（`.lrc` / `.txt`） | 每首曲目嵌入静态歌词文本 |
-| 完全离线（不联网） | 本地材料，不加 `--online` | 跳过在线搜索，仅用本地清洗 |
-
-**不支持：** 没有时间戳的录音、录音室专辑（已经分好轨的）、纯歌词 LRC 时间轴同步。
 
 ## 安装
 
@@ -47,203 +21,104 @@ cd album-extractor
 npm install
 ```
 
-**前置依赖：**
+**前置依赖：** [Node.js](https://nodejs.org/) ≥ 18、[ffmpeg](https://ffmpeg.org/)（设置 `FFMPEG_HOME` 或放 `~/Downloads/`）。
 
-- [Node.js](https://nodejs.org/) ≥ 18
-- [ffmpeg](https://ffmpeg.org/) — 设置 `FFMPEG_HOME` 环境变量指向 ffmpeg 所在目录，或放 `ffmpeg.exe` 到 `~/Downloads/`
+克隆后架设 junction，Claude Code 即可加载此 skill：
+
+```powershell
+cmd /c rmdir "$env:USERPROFILE\.claude\skills\album-extractor"
+New-Item -ItemType Junction `
+  -Path "$env:USERPROFILE\.claude\skills\album-extractor" `
+  -Target "<你的克隆路径>\album-extractor"
+```
+
+`git pull` 后 skill 自动更新，无需额外操作。
 
 验证安装：
 
 ```bash
-node tool.js          # 应输出用法提示
-npm test              # 全部测试通过
+npm test
 ```
 
-## 快速开始
+## 使用
 
-### 第一步：准备材料
+### 准备材料
 
-在 `../albums/<专辑名>/` 下放入：
-
-```
-albums/SAKANAQUARIUM 2024 turn/
-├── source.flac          # 完整音频文件
-├── cover.jpg            # 封面图（建议 ≥ 1000×1000）
-└── timestamps.md        # 手写时间戳
-```
-
-`timestamps.md` 格式自由，每行包含 `HH:MM:SS` 和曲名即可。曲名可以模糊，后续会自动规范化：
-
-```markdown
-00:02:34 Ame(B)
-00:07:02 陽炎
-00:11:49 アイデンティティ
-00:22:05 青い
-01:56:56 MC
-02:05:49 白波トップウォーター
-02:19:00 シャンディガフ
-```
-
-> MC 段落也会被切分出来——不会丢掉。标签里会标记 `isNonMusic: true`。
-
-### 第二步：生成 Manifest
-
-```bash
-node tool.js manifest "../albums/SAKANAQUARIUM 2024 turn" --online
-```
-
-这条命令会：
-1. 自动发现目录中的音频文件、封面、时间戳
-2. 解析时间戳，切出每首歌的开始位置
-3. 若指定 `--online`，会通过 Genius 搜索歌词
-4. 生成 `manifest.json`，包含每首歌的原始曲名和待确认的规范化曲名
-
-**不必指定 `--online`** 如果只是想快速本地切分。不加此标志则跳过联网搜索，只做本地清洗。
-
-### 第三步：审查 Manifest
-
-打开生成的 `manifest.json`，检查每一项：
-
-```json
-{
-  "artist": "サカナクション",
-  "albumTitle": "SAKANAQUARIUM 2024 turn",
-  "approved": false,
-  "tracks": [
-    {
-      "rawTitle": "Ame(B)",
-      "normalizedTitle": "Ame(B)",
-      "evidenceUrl": "https://...",
-      "startTime": "00:02:34",
-      "isNonMusic": false,
-      "notes": ""
-    }
-  ]
-}
-```
-
-关键操作：
-- 核对每首歌的 `normalizedTitle` 是否正确
-- 若 AI 未能匹配，手动填入正确标题
-- 确认无误后，将 `"approved"` 设为 `true`
-
-### 第四步：构建
-
-```bash
-node tool.js build --manifest "../albums/SAKANAQUARIUM 2024 turn/manifest.json"
-```
-
-构建过程：
-- 10-worker 并行处理，每首歌同时出 FLAC 和 ALAC
-- FLAC → `tracks/`，无损压缩级别 8
-- ALAC → `ALAC/`，封面以 `attached_pic` disposition 嵌入，Apple Music 可识别
-- 歌词（如有）嵌入为静态文本标签
-- 覆盖式输出——重复运行会刷新所有文件
-
-输出结构：
+在 `../albums/<专辑名>/` 下放三个文件：
 
 ```
 albums/SAKANAQUARIUM 2024 turn/
-├── source.flac
-├── cover.jpg
-├── timestamps.md
-├── manifest.json
-├── tracks/
+├── source.flac          # 完整音频（flac / m4a / mkv / mp4 / ts）
+├── cover.jpg            # 封面（≥ 1000×1000）
+└── timestamps.md        # 手写时间戳，每行 HH:MM:SS + 曲名
+```
+
+### 跟 Claude Code 对话
+
+打开终端，进入 albums 所在目录，说一句：
+
+> 处理 albums/SAKANAQUARIUM\ 2024\ turn
+
+Claude Code 会自动执行四步：
+
+```
+1. 收集    → 识别音频、封面、时间戳，询问是否需要歌词
+2. 研究    → 搜索官方曲目表，规范化专辑名和每一首曲名
+3. 审查    → 展示曲目清单让你确认，确认后设为 approved
+4. 构建    → 10-worker 并行切分编码，输出 FLAC + ALAC
+```
+
+### 你会得到
+
+```
+albums/SAKANAQUARIUM 2024 turn/
+├── manifest.json        ← 完整的曲目清单（保留原始 + 规范化后）
+├── tracks/              ← FLAC 无损存档
 │   ├── 01_Ame(B).flac
-│   ├── 02_陽炎.flac
 │   └── ...
-└── ALAC/
+└── ALAC/                ← 带封面和内嵌歌词，拖入 Apple Music 即用
     ├── 01_Ame(B).m4a
-    ├── 02_陽炎.m4a
     └── ...
 ```
 
-### 第五步：导入 Apple Music（可选）
+## 原理
 
-```bash
-cp -r "../albums/SAKANAQUARIUM 2024 turn/ALAC/"*.m4a \
-  "$HOME/Music/Apple Music/Media/Automatically Add to Apple Music/"
-```
+底层两条 CLI 命令，Claude Code 代你执行：
 
-macOS 上 Apple Music 会自动导入该文件夹中的文件。Windows 用户手动拖入即可。
+| 命令 | 作用 |
+|------|------|
+| `node tool.js manifest <album-dir> [--online]` | 解析时间戳，生成可审查的 manifest.json |
+| `node tool.js build --manifest <path>` | 读取已审批的 manifest，并行切分 + 编码 |
 
-## 命令详解
+**Manifest 是人与 AI 之间的契约。** AI 填入规范化的曲名和证据 URL，人审核后设 `"approved": true`，构建才执行。
 
-### `manifest` — 生成曲目清单
+### 适用场景
 
-```
-node tool.js manifest <album-dir> [--artist <name>] [--online]
-node tool.js manifest --artist <name> --album <title> --source <path> --timestamps <path> --cover <path> [--output <dir>] [--online]
-```
+| 你有 | 得到 |
+|------|------|
+| 无损音频 + 时间戳 + 封面 | ALAC（Apple Music 即拖即用）+ FLAC（存档） |
+| 视频源（蓝光 / MKV / TS） | 自动提取音频轨 → 同上 |
+| 已有歌词想嵌入 | 每首嵌入静态歌词文本 |
+| 完全不想联网 | 不加 `--online`，离线切分 |
 
-两种模式：
+**不支持：** 没有时间戳的录音、已经分轨的录音室专辑、LRC 时间轴同步。
 
-| 模式 | 用法 | 说明 |
-|------|------|------|
-| 目录模式 | `manifest <album-dir>` | 自动发现目录中所有素材 |
-| 显式模式 | `manifest --artist ... --album ... --source ...` | 手动指定每个文件的路径 |
+### Manifest 关键字段
 
-参数：
-
-| 参数 | 必填 | 说明 |
-|------|------|------|
-| `--artist` | 显式模式必填 | 艺人名 |
-| `--album` | 显式模式必填 | 专辑名 |
-| `--source` | 显式模式必填 | 音频/视频文件路径 |
-| `--timestamps` | 显式模式必填 | timestamps.md 路径 |
-| `--cover` | 显式模式必填 | 封面图路径 |
-| `--output` | 选填 | 输出目录（默认：源文件同目录） |
-| `--online` | 选填 | 启用 Genius 搜索。不加则离线模式 |
-
-### `build` — 切分并编码
-
-```
-node tool.js build --manifest <manifest.json>
-```
-
-前置条件：manifest 中 `"approved": true`。未审批的 manifest 构建会报错退出。
-
-## Manifest 字段说明
-
-| 字段 | 类型 | 说明 |
-|------|------|------|
-| `approved` | boolean | 构建前必须为 `true` |
-| `artist` | string | 艺人名 |
-| `albumTitle` | string | 专辑标题 |
-| `albumEvidenceUrl` | string \| null | 官方专辑标题来源 URL |
-| `year` | number \| null | 演出年份 |
-| `wantsLyrics` | boolean | 是否尝试嵌入歌词 |
-| `notes` | string | 专辑级备注 |
-| `tracks[].rawTitle` | string | 时间戳原文，不可修改 |
-| `tracks[].normalizedTitle` | string | 规范化后的曲名 |
-| `tracks[].startTime` | string | 开始时间 `HH:MM:SS` |
-| `tracks[].endTime` | string \| null | 结束时间（下一首的开始） |
-| `tracks[].isNonMusic` | boolean | MC / 谈话标记 |
-| `tracks[].evidenceUrl` | string \| null | 曲名来源 URL |
-| `tracks[].lyricText` | string \| null | 静态歌词文本 |
-| `tracks[].notes` | string | 该曲目的备注/警告 |
-
-## 作为 Claude Code Skill 使用
-
-本仓库即是一个 [Claude Code](https://claude.ai/code) skill。克隆后创建 junction：
-
-```powershell
-# 删除旧链接（如有）
-cmd /c rmdir "$env:USERPROFILE\.claude\skills\album-extractor"
-
-# 创建新 junction 指向本地仓库
-New-Item -ItemType Junction `
-  -Path "$env:USERPROFILE\.claude\skills\album-extractor" `
-  -Target "<你克隆到的路径>\album-extractor"
-```
-
-之后在任何目录打开 Claude Code，说「处理 albums/ 下这张专辑」即可触发。`git pull` 后 skill 自动更新。
+| 字段 | 说明 |
+|------|------|
+| `approved` | 设为 `true` 后构建命令才生效 |
+| `tracks[].rawTitle` | 时间戳原文，不可修改 |
+| `tracks[].normalizedTitle` | 从官方曲目表匹配的规范曲名 |
+| `tracks[].evidenceUrl` | 曲名来源 URL |
+| `tracks[].isNonMusic` | MC / 谈话段落标记 |
+| `tracks[].lyricText` | 静态歌词，无则 `null` |
 
 ## 项目结构
 
 ```
 ├── SKILL.md          ← Skill 定义，AI agent 的行为契约
-├── tool.js           ← CLI 入口（manifest / build）
+├── tool.js           ← CLI 入口
 ├── src/
 │   ├── build-album.js    ← 10-worker 并行构建
 │   ├── discover-album.js ← 自动发现专辑素材
@@ -259,11 +134,11 @@ New-Item -ItemType Junction `
 
 ## 限制
 
-- 不修改原始文件，所有输出写入新目录
+- 不修改原始文件，输出全部写入新目录
 - FLAC ↔ ALAC 是容器转换，无质量损失
 - 必须有 `timestamps.md`
-- 视频源（`.mkv` `.mp4` `.ts` `.m2ts`）支持，但若音频轨为有损编码（AAC / Opus）会提示
-- 歌词仅支持静态文本嵌入，不支持 LRC 时间同步
+- 视频源若音频轨为有损编码（AAC / Opus）会提示
+- 歌词仅静态文本，不含 LRC 时间同步
 
 ## 许可证
 
