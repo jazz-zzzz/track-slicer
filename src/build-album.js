@@ -110,8 +110,7 @@ function runProcess(command, args) {
   });
 }
 
-async function processTrack(track, manifest, flacDir, alacDir) {
-  const flacOut = path.join(flacDir, buildTrackFileName(track, 'flac'));
+async function processTrack(track, manifest, flacDir, alacDir, skipFlac) {
   const alacOut = path.join(alacDir, buildTrackFileName(track, 'm4a'));
 
   const buildOpts = {
@@ -124,9 +123,15 @@ async function processTrack(track, manifest, flacDir, alacDir) {
   };
 
   const jobs = [
-    runProcess(resolveBinary('ffmpeg'), buildFlacCommand({ ...buildOpts, outputPath: flacOut })),
     runProcess(resolveBinary('ffmpeg'), buildAlacCommand({ ...buildOpts, outputPath: alacOut })),
   ];
+
+  if (!skipFlac) {
+    const flacOut = path.join(flacDir, buildTrackFileName(track, 'flac'));
+    jobs.push(
+      runProcess(resolveBinary('ffmpeg'), buildFlacCommand({ ...buildOpts, outputPath: flacOut }))
+    );
+  }
 
   try {
     await Promise.all(jobs);
@@ -152,15 +157,19 @@ async function withConcurrency(tasks, limit) {
   return results;
 }
 
-async function buildAlbum({ manifestPath, sourceDuration }) {
+async function buildAlbum({ manifestPath, sourceDuration, skipFlac }) {
   const manifest = readManifest(manifestPath);
   assertApprovedManifest(manifest);
 
   const baseDir = path.dirname(manifestPath);
-  const flacDir = path.join(baseDir, 'tracks');
   const alacDir = path.join(baseDir, 'ALAC');
-  fs.mkdirSync(flacDir, { recursive: true });
   fs.mkdirSync(alacDir, { recursive: true });
+
+  let flacDir = null;
+  if (!skipFlac) {
+    flacDir = path.join(baseDir, 'tracks');
+    fs.mkdirSync(flacDir, { recursive: true });
+  }
 
   let duration = sourceDuration;
   if (!duration) {
@@ -174,7 +183,7 @@ async function buildAlbum({ manifestPath, sourceDuration }) {
 
   console.log(`Building ${total} tracks (pool: ${POOL_SIZE} workers)…`);
 
-  const taskFns = tracks.map((track) => () => processTrack(track, manifest, flacDir, alacDir));
+  const taskFns = tracks.map((track) => () => processTrack(track, manifest, flacDir, alacDir, skipFlac));
   const results = await withConcurrency(taskFns, POOL_SIZE);
 
   const built = results.filter((r) => r.status === 'built').length;

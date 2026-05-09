@@ -52,6 +52,7 @@ if (!validCommands.has(command)) {
 }
 
 const online = flags.has('--online');
+const noFlac = flags.has('--no-flac');
 
 // ── helpers ──
 
@@ -157,7 +158,7 @@ function printSummary(tracks) {
 
 async function runBuild(manifestPath) {
   console.log(`Building from: ${manifestPath}`);
-  const result = await buildAlbum({ manifestPath, sourceDuration: params.duration });
+  const result = await buildAlbum({ manifestPath, sourceDuration: params.duration, skipFlac: noFlac });
 
   console.log('');
   console.log(`Build complete: ${result.completed} built, ${result.failures.length} failed`);
@@ -175,6 +176,7 @@ async function runBuild(manifestPath) {
     flacDir: path.join(baseDir, 'tracks'),
     alacDir: path.join(baseDir, 'ALAC'),
     manifest,
+    skipFlac: noFlac,
   });
   console.log(`Verification: ${summary.message}`);
   if (!summary.ok) process.exit(1);

@@ -30,9 +30,9 @@ Split concert/live recordings into clean, properly-named album tracks. The AI ag
               Match raw track titles to official names. Normalize only from A/B/C sources.
 3. REVIEW   → Present manifest (with normalized album + track titles). User confirms or edits.
               Set "approved": true when ready.
-4. BUILD    → Run `node tool.js build --manifest <path>`.
+4. BUILD    → Run `node tool.js build --manifest <path> --no-flac`.
               10-worker pool processes tracks in parallel.
-              Each track: FLAC + ALAC encoded concurrently.
+              Only ALAC is built by default (save space). FLAC skipped.
               Always overwrites — re-run produces fresh output.
               After build, ask: "ALAC output is ready. Move to Apple Music auto-import folder?"
               If yes: `mv <ALAC_dir>/*.m4a "$HOME/Music/Apple Music/Media/Automatically Add to Apple Music/"`
@@ -85,10 +85,10 @@ node tool.js manifest \
 ### Build (split and encode)
 
 ```bash
-node tool.js build --manifest <manifest.json>
+node tool.js build --manifest <manifest.json> [--no-flac]
 ```
 
-Requires `"approved": true` in manifest. Always overwrites existing output files. Produces `<output>/tracks/*.flac` and `<output>/ALAC/*.m4a`.
+Requires `"approved": true` in manifest. Always overwrites existing output files. Produces `<output>/ALAC/*.m4a`, and `<output>/tracks/*.flac` unless `--no-flac` is set.
 
 ## Output Structure
 
