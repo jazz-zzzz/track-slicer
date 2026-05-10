@@ -53,6 +53,7 @@ if (!validCommands.has(command)) {
 
 const online = flags.has('--online');
 const noFlac = flags.has('--no-flac');
+const useRefalac = flags.has('--use-refalac');
 
 // ── helpers ──
 
@@ -158,7 +159,7 @@ function printSummary(tracks) {
 
 async function runBuild(manifestPath) {
   console.log(`Building from: ${manifestPath}`);
-  const result = await buildAlbum({ manifestPath, sourceDuration: params.duration, skipFlac: noFlac });
+  const result = await buildAlbum({ manifestPath, sourceDuration: params.duration, skipFlac: noFlac, useRefalac });
 
   console.log('');
   console.log(`Build complete: ${result.completed} built, ${result.failures.length} failed`);

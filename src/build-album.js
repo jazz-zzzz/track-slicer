@@ -3,9 +3,38 @@ const path = require('node:path');
 const os = require('node:os');
 const { spawn } = require('node:child_process');
 const { readManifest } = require('./manifest');
-const { buildFlacCommand, buildAlacCommand, buildTrackFileName } = require('./ffmpeg');
+const { buildFlacCommand, buildAlacCommand, buildExtractWavCommand, buildRefalacCommand, buildTrackFileName } = require('./ffmpeg');
 
 const POOL_SIZE = 10;
+
+const REFALAC_PATHS = [
+  'refalac64',
+  'refalac',
+];
+
+function resolveRefalac() {
+  const ext = os.platform() === 'win32' ? '.exe' : '';
+  // Check project-local first
+  for (const name of REFALAC_PATHS) {
+    const p = path.join(__dirname, '..', name + ext);
+    if (fs.existsSync(p)) return p;
+  }
+  // Check Downloads
+  for (const name of REFALAC_PATHS) {
+    const p = path.join(os.homedir(), 'Downloads', 'qaac', 'qaac_*', 'x64', name + ext);
+    // Glob-like check
+    const dir = path.join(os.homedir(), 'Downloads', 'qaac');
+    if (fs.existsSync(dir)) {
+      const entries = fs.readdirSync(dir);
+      for (const e of entries) {
+        const candidate = path.join(dir, e, 'x64', name + ext);
+        if (fs.existsSync(candidate)) return candidate;
+      }
+    }
+  }
+  // Fallback to bare name
+  return 'refalac64';
+}
 
 function resolveBinary(name) {
   const ext = os.platform() === 'win32' ? '.exe' : '';
@@ -110,7 +139,7 @@ function runProcess(command, args) {
   });
 }
 
-async function processTrack(track, manifest, flacDir, alacDir, skipFlac) {
+async function processTrack(track, manifest, flacDir, alacDir, skipFlac, useRefalac) {
   const alacOut = path.join(alacDir, buildTrackFileName(track, 'm4a'));
 
   const buildOpts = {
@@ -122,9 +151,18 @@ async function processTrack(track, manifest, flacDir, alacDir, skipFlac) {
     year: manifest.year,
   };
 
-  const jobs = [
-    runProcess(resolveBinary('ffmpeg'), buildAlacCommand({ ...buildOpts, outputPath: alacOut })),
-  ];
+  let alacJob;
+  if (useRefalac) {
+    // Two-step: ffmpeg extracts WAV, refalac encodes to ALAC M4A
+    const wavPath = alacOut.replace(/\.m4a$/, '.wav');
+    alacJob = runProcess(resolveBinary('ffmpeg'), buildExtractWavCommand({ ...buildOpts, outputPath: wavPath }))
+      .then(() => runProcess(resolveRefalac(), buildRefalacCommand({ ...buildOpts, wavPath, coverPath: manifest.coverPath, outputPath: alacOut })))
+      .then(() => { try { fs.unlinkSync(wavPath); } catch (_) {} });
+  } else {
+    alacJob = runProcess(resolveBinary('ffmpeg'), buildAlacCommand({ ...buildOpts, outputPath: alacOut }));
+  }
+
+  const jobs = [alacJob];
 
   if (!skipFlac) {
     const flacOut = path.join(flacDir, buildTrackFileName(track, 'flac'));
@@ -157,7 +195,7 @@ async function withConcurrency(tasks, limit) {
   return results;
 }
 
-async function buildAlbum({ manifestPath, sourceDuration, skipFlac }) {
+async function buildAlbum({ manifestPath, sourceDuration, skipFlac, useRefalac }) {
   const manifest = readManifest(manifestPath);
   assertApprovedManifest(manifest);
 
@@ -183,7 +221,7 @@ async function buildAlbum({ manifestPath, sourceDuration, skipFlac }) {
 
   console.log(`Building ${total} tracks (pool: ${POOL_SIZE} workers)…`);
 
-  const taskFns = tracks.map((track) => () => processTrack(track, manifest, flacDir, alacDir, skipFlac));
+  const taskFns = tracks.map((track) => () => processTrack(track, manifest, flacDir, alacDir, skipFlac, useRefalac));
   const results = await withConcurrency(taskFns, POOL_SIZE);
 
   const built = results.filter((r) => r.status === 'built').length;
