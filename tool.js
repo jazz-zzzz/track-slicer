@@ -9,6 +9,7 @@ const { createManifestObject, writeManifest, readManifest } = require('./src/man
 const { cleanTitle, isNonMusicTrack } = require('./src/normalize');
 const { buildAlbum } = require('./src/build-album');
 const { verifyOutput } = require('./src/verify');
+const { formatError } = require('./src/errors');
 
 // ── argument parsing ──
 
@@ -16,7 +17,7 @@ const raw = process.argv.slice(2);
 
 const commandIdx = raw.findIndex((a) => !a.startsWith('-'));
 if (commandIdx === -1) {
-  console.error('Usage: node tool.js <manifest|build> [options]');
+  console.error('Usage: node tool.js <manifest|build|summary> [options]');
   process.exit(1);
 }
 const command = raw[commandIdx];
@@ -41,16 +42,14 @@ for (let i = 0; i < rest.length; i++) {
   }
 }
 
-const validCommands = new Set(['manifest', 'build']);
+const validCommands = new Set(['manifest', 'build', 'summary']);
 if (!validCommands.has(command)) {
-  console.error('Usage: node tool.js <manifest|build> [options]');
+  console.error('Usage: node tool.js <manifest|build|summary> [options]');
   process.exit(1);
 }
 
 const noFlac = flags.has('--no-flac');
 const useRefalac = flags.has('--use-refalac');
-
-// ── helpers ──
 
 function resolveSourceDir(sourcePath) {
   return path.join(
@@ -67,28 +66,29 @@ function requireParam(name) {
   return params[name];
 }
 
-// Local title cleaning — strips translations and marks MC/talk tracks.
-// The AI agent does the actual research/normalization via WebSearch.
 function cleanTracks(tracks, artist) {
   return tracks.map((track) => {
     if (isNonMusicTrack(track.rawTitle)) {
       return {
         ...track,
         normalizedTitle: track.rawTitle,
+        normalizationStatus: 'raw',
+        trackKind: 'mc',
         evidenceUrl: null,
         lyricLookupTitle: null,
-        isNonMusic: true,
         notes: ['MC/talk segment'],
       };
     }
     const cleaned = cleanTitle(track.rawTitle);
+    const cleanedSomething = cleaned !== track.rawTitle.trim();
     return {
       ...track,
       normalizedTitle: cleaned,
+      normalizationStatus: cleanedSomething ? 'cleaned' : 'raw',
+      trackKind: 'song',
       evidenceUrl: null,
       lyricLookupTitle: `${artist} ${cleaned}`,
-      isNonMusic: false,
-      notes: ['Title cleaned locally — needs AI research for official name'],
+      notes: cleanedSomething ? ['Title cleaned locally — needs AI research for official name'] : ['Needs AI research for official name'],
     };
   });
 }
@@ -149,12 +149,48 @@ async function runManifestDirectory(albumDir, artistOverride) {
   printSummary(cleanedTracks);
 }
 
-// ── shared ──
-
 function printSummary(tracks) {
-  const mcCount = tracks.filter((t) => t.isNonMusic).length;
-  const needReview = tracks.filter((t) => !t.isNonMusic).length;
+  const mcCount = tracks.filter((t) => t.trackKind === 'mc').length;
+  const needReview = tracks.filter((t) => t.trackKind !== 'mc').length;
   console.log(`  ${needReview} need review, ${mcCount} MC/talk`);
+}
+
+// ── summary ──
+
+function runSummary(manifestPath) {
+  const manifest = readManifest(manifestPath);
+
+  const tracks = manifest.tracks || [];
+  const total = tracks.length;
+  const mcCount = tracks.filter((t) => t.trackKind === 'mc').length;
+  const introCount = tracks.filter((t) => t.trackKind === 'intro').length;
+  const songCount = tracks.filter((t) => t.trackKind === 'song').length;
+  const needReview = tracks.filter((t) => t.normalizationStatus === 'needs_review' || t.normalizationStatus === 'raw' || t.normalizationStatus === 'cleaned');
+  const verified = tracks.filter((t) => t.normalizationStatus === 'verified');
+
+  console.log(`Album: ${manifest.albumTitle}`);
+  console.log(`Artist: ${manifest.artist}`);
+  console.log(`Year: ${manifest.year || '?'}`);
+  console.log(`Tracks: ${total} total, ${songCount} songs, ${mcCount} MC, ${introCount} intro`);
+  console.log(`Status: ${verified.length} verified, ${needReview.length} need review`);
+
+  if (manifest.approved) {
+    console.log('Approved: yes');
+  } else {
+    console.log('Approved: NO — review and set "approved": true before build');
+  }
+
+  if (needReview.length > 0) {
+    console.log('');
+    console.log('Needs review:');
+    for (const t of needReview) {
+      const marker = t.normalizationStatus === 'needs_review' ? '?' : ' ';
+      console.log(`  ${String(t.number).padStart(2, '0')} [${t.normalizationStatus}] ${marker} ${t.rawTitle}`);
+      if (t.normalizedTitle !== t.rawTitle) {
+        console.log(`       -> ${t.normalizedTitle}`);
+      }
+    }
+  }
 }
 
 // ── build ──
@@ -211,6 +247,9 @@ try {
       console.error(error.message);
       process.exit(1);
     });
+  } else if (command === 'summary') {
+    const manifestPath = params.manifest || path.join(positional[0] || '.', 'manifest.json');
+    runSummary(path.isAbsolute(manifestPath) ? manifestPath : path.resolve(manifestPath));
   }
 } catch (error) {
   console.error(error.message);

@@ -3,6 +3,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { spawn } = require('node:child_process');
 const { readManifest } = require('./manifest');
+const { formatError } = require('./errors');
 const { buildFlacCommand, buildAlacCommand, buildExtractWavCommand, buildRefalacCommand, buildTrackFileName } = require('./ffmpeg');
 
 const POOL_SIZE = 10;
@@ -63,7 +64,7 @@ function resolveBinary(name) {
 function assertApprovedManifest(manifest) {
   if (manifest.approved !== true) {
     throw new Error(
-      'Manifest is not approved. Review and set "approved": true before building.'
+formatError('E_UNAPPROVED_MANIFEST')
     );
   }
 }

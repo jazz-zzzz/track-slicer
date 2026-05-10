@@ -26,6 +26,8 @@ function createManifestObject({
       end: null,
       rawTitle: track.rawTitle,
       normalizedTitle: track.normalizedTitle,
+      normalizationStatus: track.normalizationStatus ?? 'needs_review',
+      trackKind: track.trackKind ?? 'song',
       evidenceUrl: track.evidenceUrl ?? null,
       lyricLookupTitle: track.lyricLookupTitle ?? null,
       notes: track.notes ?? [],

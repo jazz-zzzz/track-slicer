@@ -9,14 +9,14 @@ const { assertApprovedManifest, resolveTrackEnds } = require('../src/build-album
 test('assertApprovedManifest throws when approved is false', () => {
   assert.throws(
     () => assertApprovedManifest({ approved: false }),
-    /Manifest is not approved/
+    /E_UNAPPROVED_MANIFEST/
   );
 });
 
 test('assertApprovedManifest throws when approved is missing', () => {
   assert.throws(
     () => assertApprovedManifest({}),
-    /Manifest is not approved/
+    /E_UNAPPROVED_MANIFEST/
   );
 });
 
@@ -73,7 +73,7 @@ test('build command rejects unapproved manifest', async () => {
     ], { encoding: 'utf8' });
 
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /not approved/);
+    assert.match(result.stderr, /E_UNAPPROVED_MANIFEST/);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

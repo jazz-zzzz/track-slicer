@@ -12,7 +12,7 @@ cd album-extractor
 npm install
 ```
 
-**Prerequisites:** [Node.js](https://nodejs.org/) ≥ 18, [ffmpeg](https://ffmpeg.org/) (set `FFMPEG_HOME` or place in `~/Downloads/`).
+**Prerequisites:** [Node.js](https://nodejs.org/) >= 18, [ffmpeg](https://ffmpeg.org/) (set `FFMPEG_HOME` or place in `~/Downloads/`).
 
 Junction into Claude Code:
 
@@ -47,7 +47,7 @@ Claude Code runs four steps:
 ```
 1. COLLECT  → Discover artist, album name, source, timestamps, cover.
 2. RESEARCH → Web-search official setlist, normalize album + track titles.
-3. REVIEW   → Present manifest. You confirm or edit. Set "approved": true.
+3. REVIEW   → Present diff summary. You confirm or edit. Set "approved": true.
 4. BUILD    → 10-worker parallel split + encode. ALAC output ready.
 ```
 
@@ -62,12 +62,13 @@ albums/SAKANAQUARIUM 2024 turn/
 
 ## How it works
 
-Two CLI commands, invoked by Claude Code on your behalf:
+Three CLI commands, invoked by Claude Code on your behalf:
 
 | Command | Purpose |
 |---------|---------|
-| `node tool.js manifest <album-dir> [--artist <name>]` | Parse timestamps, generate draft manifest |
-| `node tool.js build --manifest <path> [--no-flac] [--use-refalac]` | Split + encode approved manifest |
+| `node tool.js manifest <album-dir>` | Parse timestamps, generate draft manifest |
+| `node tool.js summary --manifest <path>` | Show review summary (diff only) |
+| `node tool.js build --manifest <path>` | Split + encode approved manifest |
 
 **The manifest is the contract.** The AI fills in normalized titles and evidence URLs. You review and set `"approved": true`. The build will not run without it.
 
@@ -76,22 +77,25 @@ Two CLI commands, invoked by Claude Code on your behalf:
 | Flag | Effect |
 |------|--------|
 | `--no-flac` | Skip FLAC output, only build ALAC |
-| `--use-refalac` | Use Apple reference ALAC encoder instead of ffmpeg native. Required for 96kHz or chapter-heavy sources that trigger ffmpeg compatibility issues |
+| `--use-refalac` | Use Apple reference ALAC encoder instead of ffmpeg native |
 
 ## Project structure
 
 ```
-├── SKILL.md          ← Skill definition — the AI agent's behavioral contract
-├── tool.js           ← CLI entry point
+├── SKILL.md              ← Skill definition — the AI agent's behavioral contract
+├── tool.js               ← CLI entry point (manifest / summary / build)
 ├── src/
 │   ├── build-album.js    ← 10-worker parallel build (ffmpeg + refalac)
 │   ├── discover-album.js ← Auto-discover album directory structure
+│   ├── errors.js         ← Short error codes
 │   ├── ffmpeg.js         ← ffmpeg/refalac command builder
-│   ├── manifest.js       ← Manifest read/write
+│   ├── manifest.js       ← Manifest read/write (with normalizationStatus + trackKind)
 │   ├── normalize.js      ← Title cleaning (strip translations, detect MC)
 │   ├── parse-timestamps.js ← Timestamp markdown parser
 │   └── verify.js         ← Output verification
-├── tests/            ← Node native test runner (43 tests)
+├── docs/
+│   └── reference.md      ← Credibility tiers, field tables, error codes, Pre-Flight
+├── tests/                ← Node native test runner (43 tests)
 ├── CLAUDE.md
 └── AGENTS.md
 ```
@@ -99,10 +103,11 @@ Two CLI commands, invoked by Claude Code on your behalf:
 ## Limits
 
 - Source files must be user-provided. The tool never downloads.
-- AAC source → ALAC is transparent repackaging, not quality improvement.
+- AAC source -> ALAC is transparent repackaging, not quality improvement.
 - Output goes to new directories. Original files untouched.
 - Video sources (.mkv, .mp4) supported — audio stream extracted via `-map 0:a`.
 - Requires `timestamps.md`. No timestamps = nothing to split.
+- Lyrics are off by default; only fetched on explicit user request.
 
 ## License
 
