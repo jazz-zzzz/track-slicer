@@ -23,7 +23,7 @@ function createManifestObject({
     tracks: researchedTracks.map((track) => ({
       number: track.number,
       start: track.start,
-      end: null,
+      end: track.end ?? null,
       rawTitle: track.rawTitle,
       normalizedTitle: track.normalizedTitle,
       normalizationStatus: track.normalizationStatus ?? 'needs_review',

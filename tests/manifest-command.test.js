@@ -45,17 +45,25 @@ test('directory mode: node tool.js manifest <album-dir> writes draft manifest', 
   assert.equal(fs.existsSync(mPath), true, `manifest not found at ${mPath}`);
 
   const manifest = JSON.parse(fs.readFileSync(mPath, 'utf8'));
-  assert.equal(manifest.tracks.length, 24);
+  // 24 source tracks + 1 auto-inserted Intro (first track starts at 00:03:07 ≠ 00:00:00)
+  assert.equal(manifest.tracks.length, 25);
   assert.equal(manifest.approved, false);
+
+  // Intro track auto-inserted
+  const intro = manifest.tracks[0];
+  assert.equal(intro.trackKind, 'intro');
+  assert.equal(intro.start, '00:00:00');
+  assert.equal(intro.end, '00:03:07');
 
   // DJ-suffixed track: halfwidth parens preserved
   const bachTrack = manifest.tracks.find((t) => t.rawTitle.includes('バッハ'));
   assert.notEqual(bachTrack, undefined);
   assert.equal(bachTrack.normalizedTitle, 'バッハの旋律を夜に聴いたせいです(DJ版)');
 
-  // MC track flagged
+  // MC track flagged as verified (not needs_review)
   const mcTrack = manifest.tracks.find((t) => t.rawTitle === 'MC环节');
   assert.notEqual(mcTrack, undefined);
+  assert.equal(mcTrack.normalizationStatus, 'verified');
   assert.equal(mcTrack.lyricLookupTitle, null);
 });
 

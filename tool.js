@@ -72,7 +72,7 @@ function cleanTracks(tracks, artist) {
       return {
         ...track,
         normalizedTitle: track.rawTitle,
-        normalizationStatus: 'raw',
+        normalizationStatus: 'verified',
         trackKind: 'mc',
         evidenceUrl: null,
         lyricLookupTitle: null,
@@ -106,6 +106,10 @@ async function runManifestExplicit() {
   const parsedTracks = parseTimestamps(fs.readFileSync(timestampsPath, 'utf8'));
   console.log(`Cleaning ${parsedTracks.length} tracks…`);
   const cleanedTracks = cleanTracks(parsedTracks, artist);
+  const tracksWithIntro = ensureIntroTrack(cleanedTracks);
+  if (tracksWithIntro.length > cleanedTracks.length) {
+    console.log('  Prepended Intro track (first track starts after 00:00:00)');
+  }
 
   const manifest = createManifestObject({
     albumName,
@@ -113,7 +117,7 @@ async function runManifestExplicit() {
     sourceAudioPath: sourcePath,
     coverPath,
     timestampsPath,
-    researchedTracks: cleanedTracks,
+    researchedTracks: tracksWithIntro,
   });
 
   const manifestPath = path.join(outputDir, 'manifest.json');
@@ -133,6 +137,10 @@ async function runManifestDirectory(albumDir, artistOverride) {
   const artist = artistOverride || 'Unknown Artist';
   console.log(`Cleaning ${parsedTracks.length} tracks…`);
   const cleanedTracks = cleanTracks(parsedTracks, artist);
+  const tracksWithIntro = ensureIntroTrack(cleanedTracks);
+  if (tracksWithIntro.length > cleanedTracks.length) {
+    console.log('  Prepended Intro track (first track starts after 00:00:00)');
+  }
 
   const manifest = createManifestObject({
     albumName: album.albumName,
@@ -140,7 +148,7 @@ async function runManifestDirectory(albumDir, artistOverride) {
     sourceAudioPath: album.sourceAudioPath,
     coverPath: album.coverPath,
     timestampsPath: album.timestampsPath,
-    researchedTracks: cleanedTracks,
+    researchedTracks: tracksWithIntro,
   });
 
   writeManifest(album.manifestPath, manifest);
@@ -149,10 +157,35 @@ async function runManifestDirectory(albumDir, artistOverride) {
   printSummary(cleanedTracks);
 }
 
+function ensureIntroTrack(tracks) {
+  if (tracks.length === 0) return tracks;
+  const first = tracks[0];
+  if (first.start === '00:00:00') return tracks;
+
+  const intro = {
+    number: 1,
+    start: '00:00:00',
+    end: first.start,
+    rawTitle: 'Intro',
+    normalizedTitle: 'Intro',
+    normalizationStatus: 'verified',
+    trackKind: 'intro',
+    evidenceUrl: null,
+    lyricLookupTitle: null,
+    notes: [`First track starts at ${first.start}`],
+  };
+
+  const shifted = tracks.map((t) => ({ ...t, number: t.number + 1 }));
+  return [intro, ...shifted];
+}
+
 function printSummary(tracks) {
   const mcCount = tracks.filter((t) => t.trackKind === 'mc').length;
-  const needReview = tracks.filter((t) => t.trackKind !== 'mc').length;
-  console.log(`  ${needReview} need review, ${mcCount} MC/talk`);
+  const introCount = tracks.filter((t) => t.trackKind === 'intro').length;
+  const needReview = tracks.filter((t) => t.trackKind === 'song').length;
+  const parts = [`${needReview} need review`, `${mcCount} MC/talk`];
+  if (introCount > 0) parts.push(`${introCount} intro`);
+  console.log(`  ${parts.join(', ')}`);
 }
 
 // ── summary ──
@@ -165,7 +198,7 @@ function runSummary(manifestPath) {
   const mcCount = tracks.filter((t) => t.trackKind === 'mc').length;
   const introCount = tracks.filter((t) => t.trackKind === 'intro').length;
   const songCount = tracks.filter((t) => t.trackKind === 'song').length;
-  const needReview = tracks.filter((t) => t.normalizationStatus === 'needs_review' || t.normalizationStatus === 'raw' || t.normalizationStatus === 'cleaned');
+  const needReview = tracks.filter((t) => t.trackKind === 'song' && (t.normalizationStatus === 'needs_review' || t.normalizationStatus === 'raw' || t.normalizationStatus === 'cleaned'));
   const verified = tracks.filter((t) => t.normalizationStatus === 'verified');
 
   console.log(`Album: ${manifest.albumTitle}`);
