@@ -2,6 +2,19 @@ function sanitizeFilename(title) {
   return title.replace(/[<>:"/\\|?*]/g, '_');
 }
 
+function timeToSeconds(t) {
+  const parts = t.split(':').map(Number);
+  return parts[0] * 3600 + parts[1] * 60 + parts[2];
+}
+
+function formatDuration(seconds) {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${pad(h)}:${pad(m)}:${pad(s.toFixed(3))}`;
+}
+
 function buildFlacCommand({
   sourceAudioPath,
   coverPath,
@@ -13,12 +26,15 @@ function buildFlacCommand({
 }) {
   const args = [
     '-y',
+    '-ss', track.start,
     '-i', sourceAudioPath,
     '-i', coverPath,
-    '-ss', track.start,
   ];
 
-  if (track.end) args.push('-to', track.end);
+  if (track.end) {
+    const dur = timeToSeconds(track.end) - timeToSeconds(track.start);
+    args.push('-t', formatDuration(dur));
+  }
 
   args.push(
     '-map_chapters', '-1',
@@ -52,12 +68,15 @@ function buildAlacCommand({
 }) {
   const args = [
     '-y',
+    '-ss', track.start,
     '-i', sourceAudioPath,
     '-i', coverPath,
-    '-ss', track.start,
   ];
 
-  if (track.end) args.push('-to', track.end);
+  if (track.end) {
+    const dur = timeToSeconds(track.end) - timeToSeconds(track.start);
+    args.push('-t', formatDuration(dur));
+  }
 
   args.push(
     '-map_chapters', '-1',
@@ -88,11 +107,14 @@ function buildExtractWavCommand({
 }) {
   const args = [
     '-y',
-    '-i', sourceAudioPath,
     '-ss', track.start,
+    '-i', sourceAudioPath,
   ];
 
-  if (track.end) args.push('-to', track.end);
+  if (track.end) {
+    const dur = timeToSeconds(track.end) - timeToSeconds(track.start);
+    args.push('-t', formatDuration(dur));
+  }
 
   args.push(
     '-map_chapters', '-1',
