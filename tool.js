@@ -6,7 +6,7 @@ const path = require('node:path');
 const { discoverAlbum } = require('./src/discover-album');
 const { parseTimestamps } = require('./src/parse-timestamps');
 const { createManifestObject, writeManifest, readManifest } = require('./src/manifest');
-const { researchAlbum } = require('./src/research');
+const { cleanTitle, isNonMusicTrack } = require('./src/titles');
 const { buildAlbum } = require('./src/build-album');
 const { verifyOutput } = require('./src/verify');
 
@@ -14,7 +14,6 @@ const { verifyOutput } = require('./src/verify');
 
 const raw = process.argv.slice(2);
 
-// Separate command from the rest
 const commandIdx = raw.findIndex((a) => !a.startsWith('-'));
 if (commandIdx === -1) {
   console.error('Usage: node tool.js <manifest|build> [options]');
@@ -22,10 +21,7 @@ if (commandIdx === -1) {
 }
 const command = raw[commandIdx];
 
-// Everything after the command
 const rest = raw.slice(commandIdx + 1);
-
-// Parse --key value pairs, --flags, and collect positionals
 const params = {};
 const flags = new Set();
 const positional = [];
@@ -51,7 +47,6 @@ if (!validCommands.has(command)) {
   process.exit(1);
 }
 
-const online = flags.has('--online');
 const noFlac = flags.has('--no-flac');
 const useRefalac = flags.has('--use-refalac');
 
@@ -72,6 +67,32 @@ function requireParam(name) {
   return params[name];
 }
 
+// Local title cleaning — strips translations and marks MC/talk tracks.
+// The AI agent does the actual research/normalization via WebSearch.
+function cleanTracks(tracks, artist) {
+  return tracks.map((track) => {
+    if (isNonMusicTrack(track.rawTitle)) {
+      return {
+        ...track,
+        normalizedTitle: track.rawTitle,
+        evidenceUrl: null,
+        lyricLookupTitle: null,
+        isNonMusic: true,
+        notes: ['MC/talk segment'],
+      };
+    }
+    const cleaned = cleanTitle(track.rawTitle);
+    return {
+      ...track,
+      normalizedTitle: cleaned,
+      evidenceUrl: null,
+      lyricLookupTitle: `${artist} ${cleaned}`,
+      isNonMusic: false,
+      notes: ['Title cleaned locally — needs AI research for official name'],
+    };
+  });
+}
+
 // ── manifest: explicit mode ──
 
 async function runManifestExplicit() {
@@ -82,16 +103,9 @@ async function runManifestExplicit() {
   const coverPath = requireParam('cover');
   const outputDir = params.output || resolveSourceDir(sourcePath);
 
-  const timestampMarkdown = fs.readFileSync(timestampsPath, 'utf8');
-  const parsedTracks = parseTimestamps(timestampMarkdown);
-
-  console.log(`Researching ${parsedTracks.length} tracks…`);
-  const researchedTracks = await researchAlbum({
-    tracks: parsedTracks,
-    albumName,
-    artist,
-    options: { offline: !online },
-  });
+  const parsedTracks = parseTimestamps(fs.readFileSync(timestampsPath, 'utf8'));
+  console.log(`Cleaning ${parsedTracks.length} tracks…`);
+  const cleanedTracks = cleanTracks(parsedTracks, artist);
 
   const manifest = createManifestObject({
     albumName,
@@ -99,7 +113,7 @@ async function runManifestExplicit() {
     sourceAudioPath: sourcePath,
     coverPath,
     timestampsPath,
-    researchedTracks,
+    researchedTracks: cleanedTracks,
   });
 
   const manifestPath = path.join(outputDir, 'manifest.json');
@@ -107,25 +121,18 @@ async function runManifestExplicit() {
   writeManifest(manifestPath, manifest);
   console.log(`Manifest written: ${manifestPath}`);
 
-  printSummary(researchedTracks);
+  printSummary(cleanedTracks);
 }
 
 // ── manifest: directory mode ──
 
 async function runManifestDirectory(albumDir, artistOverride) {
   const album = discoverAlbum(albumDir);
-  const timestampMarkdown = fs.readFileSync(album.timestampsPath, 'utf8');
-  const parsedTracks = parseTimestamps(timestampMarkdown);
+  const parsedTracks = parseTimestamps(fs.readFileSync(album.timestampsPath, 'utf8'));
 
   const artist = artistOverride || 'Unknown Artist';
-
-  console.log(`Researching ${parsedTracks.length} tracks…`);
-  const researchedTracks = await researchAlbum({
-    tracks: parsedTracks,
-    albumName: album.albumName,
-    artist,
-    options: { offline: !online },
-  });
+  console.log(`Cleaning ${parsedTracks.length} tracks…`);
+  const cleanedTracks = cleanTracks(parsedTracks, artist);
 
   const manifest = createManifestObject({
     albumName: album.albumName,
@@ -133,24 +140,21 @@ async function runManifestDirectory(albumDir, artistOverride) {
     sourceAudioPath: album.sourceAudioPath,
     coverPath: album.coverPath,
     timestampsPath: album.timestampsPath,
-    researchedTracks,
+    researchedTracks: cleanedTracks,
   });
 
   writeManifest(album.manifestPath, manifest);
   console.log(`Manifest written: ${album.manifestPath}`);
 
-  printSummary(researchedTracks);
+  printSummary(cleanedTracks);
 }
 
 // ── shared ──
 
 function printSummary(tracks) {
   const mcCount = tracks.filter((t) => t.isNonMusic).length;
-  const geniusHits = tracks.filter((t) => t.evidenceUrl && t.evidenceUrl.includes('genius.com')).length;
-  const needReview = tracks.filter((t) => !t.isNonMusic && !t.evidenceUrl).length;
-  console.log(
-    `  ${geniusHits} Genius hits, ${needReview} need review, ${mcCount} MC/talk`
-  );
+  const needReview = tracks.filter((t) => !t.isNonMusic).length;
+  console.log(`  ${needReview} need review, ${mcCount} MC/talk`);
 }
 
 // ── build ──
@@ -168,7 +172,6 @@ async function runBuild(manifestPath) {
     }
   }
 
-  // Verify
   const manifest = readManifest(manifestPath);
   const baseDir = path.dirname(manifestPath);
   const summary = verifyOutput({
@@ -191,11 +194,10 @@ try {
         process.exit(1);
       });
     } else {
-      // Directory mode: first positional is the album dir
       if (positional.length === 0) {
         console.error(
-          'Usage: node tool.js manifest <album-dir> [--artist <name>] [--online]\n' +
-          '       node tool.js manifest --artist <name> --album <name> --source <path> --timestamps <path> --cover <path> [--output <dir>] [--online]'
+          'Usage: node tool.js manifest <album-dir> [--artist <name>]\n' +
+          '       node tool.js manifest --artist <name> --album <name> --source <path> --timestamps <path> --cover <path> [--output <dir>]'
         );
         process.exit(1);
       }

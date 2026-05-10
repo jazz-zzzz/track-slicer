@@ -10,7 +10,5 @@
   "author": "",
   "license": "ISC",
   "type": "commonjs",
-  "dependencies": {
-    "genius-lyrics": "^4.4.7"
-  }
+  "dependencies": {}
 }

@@ -9,7 +9,7 @@ description: Use when the user has a concert/live audio or video file with fuzzy
 
 Split concert/live recordings into clean, properly-named album tracks. The AI agent handles research and normalization; CLI scripts handle deterministic execution. The manifest is the contract between them.
 
-**CRITICAL: The CLI is the contract. Do NOT read source code before invoking commands.** Run `node tool.js <command>` directly. Only read source files if a command fails with an unexpected error or you need to understand a specific behavior not documented here.
+**CRITICAL: The CLI is the contract. Do NOT read source code before invoking commands.** Run `node tool.js <command>` directly. Only read source files if a command fails with an unexpected error.
 
 ## When to Use
 
@@ -23,7 +23,7 @@ Split concert/live recordings into clean, properly-named album tracks. The AI ag
 ## Workflow
 
 ```
-1. COLLECT  → Extract/ask: artist, album name, source file, timestamps, cover.
+1. COLLECT  → Discover artist, album name, source file, timestamps, cover.
 2. RESEARCH → Web-search the official setlist AND album title using credibility tiers.
               Normalize albumTitle (e.g. directory "turn 2024" → official "SAKANAQUARIUM 2024 turn").
               Match raw track titles to official names. Normalize only from A/B/C sources.
@@ -32,11 +32,9 @@ Split concert/live recordings into clean, properly-named album tracks. The AI ag
 4. BUILD    → Run `node tool.js build --manifest <path> --no-flac`.
               10-worker pool processes tracks in parallel.
               Only ALAC is built when `--no-flac` is set (recommended to save space).
-              Add `--use-refalac` for sources with high sample rate (96kHz) or embedded
-              chapters that cause ffmpeg ALAC compatibility issues with Apple Music.
+              Add `--use-refalac` for sources with high sample rate (96kHz) or embedded chapters.
               Always overwrites — re-run produces fresh output.
-              After build, ask: "ALAC output is ready. Move to Apple Music auto-import folder?"
-              If yes: `mv <ALAC_dir>/*.m4a "$HOME/Music/Apple Music/Media/Automatically Add to Apple Music/"`
+              After build, ask: "Move to Apple Music auto-import folder?"
 ```
 
 ## Credibility Tiers
@@ -53,19 +51,19 @@ Split concert/live recordings into clean, properly-named album tracks. The AI ag
 ## Core Principles
 
 1. **Do not add information.** `normalizedTitle` and `albumTitle` must be verifiable from an evidence URL. No romanizations, translations, or unsourced annotations.
-2. **Do not rewrite titles.** Official title is "hana"? Keep "hana". Do not convert to 花 or Flower. Same for album titles.
-3. **Album title gets the same normalization.** The directory name or user-provided album name is a hint — the official album title comes from research (Blu-ray product page, official site, etc.).
+2. **Do not rewrite titles.** Official title is "hana"? Keep "hana". Do not convert to 花 or Flower.
+3. **Album title gets the same normalization.** The directory name is a hint — the official album title comes from research.
 4. **Every correction gets a note.** When a normalized field differs from the raw input, explain why in `notes`.
 5. **Code is deterministic, AI is fuzzy.** Scripts parse, split, and encode. AI searches, matches, and normalizes.
 6. **When uncertain, preserve the raw value.** Flag it "needs review" rather than guessing.
-7. **Preserve the intro.** If Track 1's start time is not 00:00, the AI agent must prepend an "Intro" track from 00:00 to the first timestamp in the manifest. This is not automatic — the agent adds it manually during manifest construction.
+7. **Preserve the intro.** If Track 1's start time is not 00:00, prepend an "Intro" track from 00:00 to the first timestamp. The AI agent adds it manually during manifest construction.
 
-## Pre-Flight Checks (before any command)
+## Pre-Flight Checks
 
-1. **File paths must be ASCII-safe.** Rename files with curly quotes `""`, fullwidth chars, or special Unicode before processing. Use `node -e "fs.renameSync(...)"` if needed. ffmpeg and shell will choke on these.
-2. **ffmpeg must be reachable.** Set `FFMPEG_HOME` env var pointing to the ffmpeg directory, or place ffmpeg.exe in `~/Downloads/`. The tool auto-resolves from these locations, then falls back to PATH.
-3. **Cover must be a real image file** (jpg/png). The ffmpeg command uses a second input stream for cover art attachment.
-4. **refalac (if using `--use-refalac`).** Download `qaac` from [github.com/nu774/qaac](https://github.com/nu774/qaac) and extract to `~/Downloads/qaac/`. The tool auto-discovers `refalac64.exe` from there. Only needed for sources that trigger ffmpeg ALAC compatibility issues (96kHz sample rate, embedded chapters in source).
+1. **File paths must be ASCII-safe.** Rename files with curly quotes, fullwidth chars, or special Unicode before processing.
+2. **ffmpeg must be reachable.** Set `FFMPEG_HOME` env var, or place ffmpeg.exe in `~/Downloads/`.
+3. **Cover must be a real image file** (jpg/png).
+4. **refalac (if using `--use-refalac`).** Download `qaac` from [github.com/nu774/qaac](https://github.com/nu774/qaac) and extract to `~/Downloads/qaac/`. Only needed for sources that trigger ffmpeg ALAC compatibility issues (96kHz sample rate, embedded chapters).
 
 ## CLI Reference
 
@@ -73,16 +71,16 @@ Split concert/live recordings into clean, properly-named album tracks. The AI ag
 
 ```bash
 # Directory mode — auto-discovers source, cover, timestamps in album dir
-node tool.js manifest <album-dir> [--artist <name>] [--online]
+node tool.js manifest <album-dir> [--artist <name>]
 
 # Explicit mode — all paths specified
 node tool.js manifest \
   --artist <name> --album <title> \
   --source <audio.flac> --timestamps <timestamps.md> --cover <cover.jpg> \
-  [--output <dir>] [--online]
+  [--output <dir>]
 ```
 
-`--online` enables Genius-assisted title search as a first pass. Without it (default), only local cleaning is applied — the AI agent must do the full research.
+The manifest command applies local title cleaning (strips translations, marks MC/talk tracks). The AI agent must do the full research and normalization — editing `normalizedTitle`, `evidenceUrl`, and `notes` in the manifest before approving.
 
 ### Build (split and encode)
 
@@ -92,7 +90,7 @@ node tool.js build --manifest <manifest.json> [--no-flac] [--use-refalac]
 
 Requires `"approved": true` in manifest. Always overwrites existing output files. Produces `<output>/ALAC/*.m4a`, and `<output>/tracks/*.flac` unless `--no-flac` is set.
 
-`--use-refalac` switches the ALAC encoder from ffmpeg native (`alac`) to Apple's reference implementation (`refalac`). Use this when the source has high sample rate (96kHz) or embedded chapters that cause ffmpeg ALAC output to be rejected by Apple Music. refalac must be installed — download from [github.com/nu774/qaac](https://github.com/nu774/qaac), extract, and the tool auto-discovers `refalac64.exe` under `~/Downloads/qaac/`.
+`--use-refalac` uses Apple's reference ALAC encoder instead of ffmpeg native. Use for 96kHz sources or sources with embedded chapters that cause ffmpeg ALAC output to be rejected by Apple Music.
 
 ## Output Structure
 
@@ -130,4 +128,4 @@ Requires `"approved": true` in manifest. Always overwrites existing output files
 - Does NOT do lossy transcoding. FLAC ↔ ALAC is lossless container conversion.
 - Does NOT work without timestamps. A timestamps.md (or equivalent) is required.
 - Does NOT modify original files. All output goes to new directories.
-- Video sources (.mkv, .mp4, .mov, .ts, .m2ts) are supported. Audio stream is extracted directly via `-map 0:a`. If the audio track is lossy (AAC/Opus), warn the user that the source quality is inherently limited.
+- Video sources (.mkv, .mp4, .mov, .ts, .m2ts) are supported. Audio stream is extracted via `-map 0:a`. Warn if the audio track is lossy (AAC/Opus).
