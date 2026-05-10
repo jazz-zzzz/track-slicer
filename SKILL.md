@@ -24,7 +24,6 @@ Split concert/live recordings into clean, properly-named album tracks. The AI ag
 
 ```
 1. COLLECT  → Extract/ask: artist, album name, source file, timestamps, cover.
-              Always ask: "Do you want lyrics embedded?" (see Lyrics Strategy below)
 2. RESEARCH → Web-search the official setlist AND album title using credibility tiers.
               Normalize albumTitle (e.g. directory "turn 2024" → official "SAKANAQUARIUM 2024 turn").
               Match raw track titles to official names. Normalize only from A/B/C sources.
@@ -32,7 +31,9 @@ Split concert/live recordings into clean, properly-named album tracks. The AI ag
               Set "approved": true when ready.
 4. BUILD    → Run `node tool.js build --manifest <path> --no-flac`.
               10-worker pool processes tracks in parallel.
-              Only ALAC is built by default (save space). FLAC skipped.
+              Only ALAC is built when `--no-flac` is set (recommended to save space).
+              Add `--use-refalac` for sources with high sample rate (96kHz) or embedded
+              chapters that cause ffmpeg ALAC compatibility issues with Apple Music.
               Always overwrites — re-run produces fresh output.
               After build, ask: "ALAC output is ready. Move to Apple Music auto-import folder?"
               If yes: `mv <ALAC_dir>/*.m4a "$HOME/Music/Apple Music/Media/Automatically Add to Apple Music/"`
@@ -57,7 +58,7 @@ Split concert/live recordings into clean, properly-named album tracks. The AI ag
 4. **Every correction gets a note.** When a normalized field differs from the raw input, explain why in `notes`.
 5. **Code is deterministic, AI is fuzzy.** Scripts parse, split, and encode. AI searches, matches, and normalizes.
 6. **When uncertain, preserve the raw value.** Flag it "needs review" rather than guessing.
-7. **Preserve the intro.** If Track 1's start time is not 00:00, automatically prepend an "Intro" track from 00:00 to the first timestamp. The intro is part of the complete album experience — opening ambiance, crowd noise, overture, etc. Do NOT ask the user whether to include it; just do it.
+7. **Preserve the intro.** If Track 1's start time is not 00:00, the AI agent must prepend an "Intro" track from 00:00 to the first timestamp in the manifest. This is not automatic — the agent adds it manually during manifest construction.
 
 ## Pre-Flight Checks (before any command)
 
@@ -96,7 +97,7 @@ Requires `"approved": true` in manifest. Always overwrites existing output files
 ## Output Structure
 
 ```
-<output-dir>/          ← default: <source-dir>/<source-name>/
+<output-dir>/          ← default: <source-dir>/<source-filename-stem>/
   manifest.json
   tracks/
     01_Title.flac
@@ -117,26 +118,11 @@ Requires `"approved": true` in manifest. Always overwrites existing output files
 | `albumEvidenceUrl` | Source URL for the official album title |
 | `artist` | Normalized artist name |
 | `year` | Concert year (AI fills from research) |
-| `wantsLyrics` | Whether lyrics should be embedded |
 | `notes` | Album-level notes (research summary, normalization decisions) |
 | `tracks[].rawTitle` | Original text from timestamps — never modified |
 | `tracks[].normalizedTitle` | Official title, verifiable from evidenceUrl |
 | `tracks[].evidenceUrl` | Source URL for the normalized title |
-| `tracks[].lyricText` | Static lyrics text (null if not requested/unavailable) |
 | `tracks[].notes` | Correction explanations, flags like "needs review" |
-
-## Lyrics Strategy
-
-Lyrics are optional and expensive to fetch. No bulk API works reliably across network environments.
-
-**Tiered approach (in order of preference):**
-
-1. **User provides lyrics file.** If the user already has `.lrc` or `.txt` files, parse and embed them directly.
-2. **AI WebSearch per song.** Search `"<title> <artist> 歌詞 全文"`. The search summary often returns full lyrics. Slow but accurate. Only for small batches (≤5 songs at a time).
-3. **AI knowledge.** For very famous songs, the AI may know the lyrics. MUST be flagged `"source confidence: AI knowledge, needs verification"`.
-4. **Skip.** If none of the above works, leave `lyricText: null` and note the reason.
-
-**Never:** make up lyrics, scrape blocked sites repeatedly, or promise lyrics that can't be verified.
 
 ## Boundaries
 
@@ -144,5 +130,4 @@ Lyrics are optional and expensive to fetch. No bulk API works reliably across ne
 - Does NOT do lossy transcoding. FLAC ↔ ALAC is lossless container conversion.
 - Does NOT work without timestamps. A timestamps.md (or equivalent) is required.
 - Does NOT modify original files. All output goes to new directories.
-- Lyrics are static text only (no LRC time-sync). User is asked before fetching.
 - Video sources (.mkv, .mp4, .mov, .ts, .m2ts) are supported. Audio stream is extracted directly via `-map 0:a`. If the audio track is lossy (AAC/Opus), warn the user that the source quality is inherently limited.

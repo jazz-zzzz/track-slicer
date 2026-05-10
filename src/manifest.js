@@ -9,7 +9,6 @@ function createManifestObject({
   researchedTracks,
   year = null,
   albumEvidenceUrl = null,
-  wantsLyrics = false,
 }) {
   return {
     approved: false,
@@ -17,7 +16,6 @@ function createManifestObject({
     albumEvidenceUrl,
     artist: artist || 'Unknown Artist',
     year,
-    wantsLyrics,
     sourceAudioPath,
     coverPath,
     timestampsPath,
@@ -30,8 +28,6 @@ function createManifestObject({
       normalizedTitle: track.normalizedTitle,
       evidenceUrl: track.evidenceUrl ?? null,
       lyricLookupTitle: track.lyricLookupTitle ?? null,
-      lyricText: null,
-      lyricSource: track.lyricSource ?? null,
       notes: track.notes ?? [],
     })),
   };

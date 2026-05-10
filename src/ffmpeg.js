@@ -51,7 +51,6 @@ function buildFlacCommand({
   );
 
   if (year) args.push('-metadata', `date=${String(year)}`);
-  if (track.lyricText) args.push('-metadata', `LYRICS=${track.lyricText}`);
 
   args.push(outputPath);
   return args;
@@ -92,7 +91,6 @@ function buildAlacCommand({
   );
 
   if (year) args.push('-metadata', `date=${String(year)}`);
-  if (track.lyricText) args.push('-metadata', `lyrics=${track.lyricText}`);
 
   args.push(outputPath);
   return args;

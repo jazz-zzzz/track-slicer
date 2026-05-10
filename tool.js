@@ -5,7 +5,7 @@ const path = require('node:path');
 
 const { discoverAlbum } = require('./src/discover-album');
 const { parseTimestamps } = require('./src/parse-timestamps');
-const { createManifestObject, writeManifest } = require('./src/manifest');
+const { createManifestObject, writeManifest, readManifest } = require('./src/manifest');
 const { researchAlbum } = require('./src/research');
 const { buildAlbum } = require('./src/build-album');
 const { verifyOutput } = require('./src/verify');
@@ -146,10 +146,8 @@ async function runManifestDirectory(albumDir, artistOverride) {
 
 function printSummary(tracks) {
   const mcCount = tracks.filter((t) => t.isNonMusic).length;
-  const geniusHits = tracks.filter((t) => t.lyricSource === 'genius').length;
-  const needReview = tracks.filter(
-    (t) => !t.isNonMusic && t.lyricSource !== 'genius'
-  ).length;
+  const geniusHits = tracks.filter((t) => t.evidenceUrl && t.evidenceUrl.includes('genius.com')).length;
+  const needReview = tracks.filter((t) => !t.isNonMusic && !t.evidenceUrl).length;
   console.log(
     `  ${geniusHits} Genius hits, ${needReview} need review, ${mcCount} MC/talk`
   );
@@ -171,7 +169,7 @@ async function runBuild(manifestPath) {
   }
 
   // Verify
-  const manifest = require('./src/manifest').readManifest(manifestPath);
+  const manifest = readManifest(manifestPath);
   const baseDir = path.dirname(manifestPath);
   const summary = verifyOutput({
     flacDir: path.join(baseDir, 'tracks'),

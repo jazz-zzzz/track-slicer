@@ -8,7 +8,6 @@ const defaultTrack = {
   start: '00:02:34',
   end: '00:07:02',
   normalizedTitle: 'Ame (B)',
-  lyricText: null,
 };
 
 const defaultOpts = {
@@ -49,24 +48,6 @@ test('buildFlacCommand omits -t when track.end is null', () => {
   const cmd = buildFlacCommand({ ...defaultOpts, track, outputPath: 'out.flac' });
 
   assert.ok(!cmd.includes('-t'));
-});
-
-test('both commands embed lyrics when present', () => {
-  const track = { ...defaultTrack, lyricText: 'lyrics content' };
-
-  const flacCmd = buildFlacCommand({ ...defaultOpts, track, outputPath: 'out.flac' });
-  assert.ok(flacCmd.includes('LYRICS=lyrics content'));
-
-  const alacCmd = buildAlacCommand({ ...defaultOpts, track, outputPath: 'out.m4a' });
-  assert.ok(alacCmd.includes('lyrics=lyrics content'));
-});
-
-test('both commands omit lyrics metadata when lyricText is null', () => {
-  const flacCmd = buildFlacCommand({ ...defaultOpts, outputPath: 'out.flac' });
-  assert.ok(!flacCmd.some((a) => a.startsWith('LYRICS=')));
-
-  const alacCmd = buildAlacCommand({ ...defaultOpts, outputPath: 'out.m4a' });
-  assert.ok(!alacCmd.some((a) => a.startsWith('lyrics=')));
 });
 
 test('buildTrackFileName pads track number and sanitizes title', () => {

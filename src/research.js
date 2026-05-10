@@ -8,29 +8,23 @@ const NON_MUSIC_PATTERN = /MC|MC环节|MC×\d|讲话|成员介绍|开场|揭幕|
 function cleanTitle(rawTitle) {
   let title = rawTitle.trim();
 
-  // 1. Strip Japanese corner brackets
+  // Strip Japanese corner brackets
   title = title.replace(/^『|』$/g, '');
 
-  // 2. Strip slash-separated translations (keep first segment — the Japanese original)
-  //    e.g. "モス/moth/蛾" → "モス", "マッチとピーナッツ /花生与火柴" → "マッチとピーナッツ"
+  // Strip slash-separated translations (keep first segment — the Japanese original)
   if (title.includes('/')) {
     title = title.split('/')[0].trim();
   }
 
-  // 3. Strip fullwidth parenthetical translations (Chinese/English after Japanese)
-  //    e.g. "グッドバイ（Good Bye）" → "グッドバイ", "ユリイカ（Eureka）" → "ユリイカ"
-  //    Only strip if content looks like a translation (not a version marker)
+  // Strip fullwidth parenthetical translations (Chinese/English after Japanese)
+  // Only strip if content looks like a translation (not a version marker)
   title = title.replace(/\s*（([^）]*)）$/u, (_full, inner) => {
-    if (VERSION_KEYWORDS.test(inner)) return _full; // keep version markers
-    return ''; // strip translations
+    if (VERSION_KEYWORDS.test(inner)) return _full;
+    return '';
   });
 
-  // 4. Final trim
   title = title.trim();
-
-  // 5. If we stripped everything, return original
   if (!title) return rawTitle.trim();
-
   return title;
 }
 
@@ -57,28 +51,22 @@ function getGeniusClient() {
 async function searchGenius(query, geniusClient) {
   const searches = await geniusClient.songs.search(query, { sanitizeQuery: false });
   if (!searches || searches.length === 0) return null;
-  const song = searches[0];
   return {
-    title: song.title,
-    url: song.url,
-    id: song.id,
-    artist: song.artist?.name ?? null,
-    image: song.image ?? null,
+    title: searches[0].title,
+    url: searches[0].url,
+    id: searches[0].id,
   };
 }
 
 async function researchTrack(track, artist, geniusClient) {
-  // MC/talk segments — skip all network calls
   if (isNonMusicTrack(track.rawTitle)) {
     return {
       ...track,
       normalizedTitle: track.rawTitle,
       evidenceUrl: null,
       lyricLookupTitle: null,
-      lyricSource: null,
       isNonMusic: true,
-      researchError: null,
-      notes: ['MC/talk segment — no lyrics lookup'],
+      notes: ['MC/talk segment'],
     };
   }
 
@@ -100,7 +88,6 @@ async function researchTrack(track, artist, geniusClient) {
       normalizedTitle: cleaned,
       evidenceUrl: null,
       lyricLookupTitle: query,
-      lyricSource: null,
       isNonMusic: false,
       researchError,
       notes: [`Genius search failed: ${researchError}`],
@@ -113,9 +100,7 @@ async function researchTrack(track, artist, geniusClient) {
       normalizedTitle: cleaned,
       evidenceUrl: null,
       lyricLookupTitle: query,
-      lyricSource: null,
       isNonMusic: false,
-      researchError: null,
       notes: ['No Genius match found — review needed'],
     };
   }
@@ -125,15 +110,12 @@ async function researchTrack(track, artist, geniusClient) {
     normalizedTitle: geniusResult.title,
     evidenceUrl: geniusResult.url,
     lyricLookupTitle: query,
-    lyricSource: 'genius',
     isNonMusic: false,
-    researchError: null,
-    geniusId: geniusResult.id,
     notes: [],
   };
 }
 
-async function researchAlbum({ tracks, albumName, artist = 'サカナクション', options = {} }) {
+async function researchAlbum({ tracks, artist, options = {} }) {
   const {
     rateLimitMs = 1000,
     geniusClient = null,
@@ -148,10 +130,8 @@ async function researchAlbum({ tracks, albumName, artist = 'サカナクショ�
           normalizedTitle: track.rawTitle,
           evidenceUrl: null,
           lyricLookupTitle: null,
-          lyricSource: null,
           isNonMusic: true,
-          researchError: null,
-          notes: ['MC/talk segment — no lyrics lookup (offline)'],
+          notes: ['MC/talk segment (offline)'],
         };
       }
       const cleaned = cleanTitle(track.rawTitle);
@@ -160,9 +140,7 @@ async function researchAlbum({ tracks, albumName, artist = 'サカナクショ�
         normalizedTitle: cleaned,
         evidenceUrl: null,
         lyricLookupTitle: `${artist} ${cleaned}`,
-        lyricSource: null,
         isNonMusic: false,
-        researchError: null,
         notes: ['Offline mode — title cleaned locally, not verified against Genius'],
       };
     });
@@ -175,7 +153,6 @@ async function researchAlbum({ tracks, albumName, artist = 'サカナクショ�
     const result = await researchTrack(tracks[i], artist, client);
     results.push(result);
 
-    // Rate limit between requests (skip after last)
     if (i < tracks.length - 1) {
       await sleep(rateLimitMs);
     }

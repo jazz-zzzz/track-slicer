@@ -19,7 +19,6 @@ function createSampleResearchedTracks() {
       normalizedTitle: 'Ame (B)',
       evidenceUrl: 'https://sakanaction.jp/feature/turn_blu-ray',
       lyricLookupTitle: 'サカナクション Ame',
-      lyricSource: 'genius',
       notes: [],
     },
     {
@@ -29,7 +28,6 @@ function createSampleResearchedTracks() {
       normalizedTitle: '陽炎',
       evidenceUrl: null,
       lyricLookupTitle: 'サカナクション 陽炎',
-      lyricSource: null,
       notes: ['No Genius match found — review needed'],
     },
   ];
@@ -45,7 +43,6 @@ test('createManifestObject returns the full manifest shape with all fields', () 
     timestampsPath: 'albums/turn/timestamps.md',
     year: '2025',
     albumEvidenceUrl: 'https://sakanaction.jp/feature/turn_blu-ray',
-    wantsLyrics: true,
     researchedTracks,
   });
 
@@ -54,11 +51,9 @@ test('createManifestObject returns the full manifest shape with all fields', () 
   assert.equal(manifest.albumEvidenceUrl, 'https://sakanaction.jp/feature/turn_blu-ray');
   assert.equal(manifest.artist, 'サカナクション');
   assert.equal(manifest.year, '2025');
-  assert.equal(manifest.wantsLyrics, true);
   assert.equal(manifest.tracks.length, 2);
   assert.equal(manifest.tracks[0].normalizedTitle, 'Ame (B)');
   assert.equal(manifest.tracks[0].evidenceUrl, 'https://sakanaction.jp/feature/turn_blu-ray');
-  assert.equal(manifest.tracks[0].lyricSource, 'genius');
   assert.equal(manifest.tracks[1].normalizedTitle, '陽炎');
   assert.equal(manifest.tracks[1].notes.length, 1);
 });
@@ -80,10 +75,8 @@ test('createManifestObject uses defaults when optional fields omitted', () => {
   assert.equal(manifest.artist, 'Unknown Artist');
   assert.equal(manifest.year, null);
   assert.equal(manifest.albumEvidenceUrl, null);
-  assert.equal(manifest.wantsLyrics, false);
   assert.equal(manifest.tracks[0].evidenceUrl, null);
   assert.equal(manifest.tracks[0].lyricLookupTitle, null);
-  assert.equal(manifest.tracks[0].lyricText, null);
   assert.deepEqual(manifest.tracks[0].notes, []);
 });
 

@@ -121,7 +121,6 @@ test('researchAlbum skips Genius for MC tracks', async () => {
 
   const results = await researchAlbum({
     tracks,
-    albumName: 'Test',
     options: { geniusClient: mockClient, rateLimitMs: 0 },
   });
 
@@ -141,12 +140,10 @@ test('researchAlbum normalizes via Genius result', async () => {
 
   const results = await researchAlbum({
     tracks,
-    albumName: 'Test',
     options: { geniusClient: mockClient, rateLimitMs: 0 },
   });
 
   assert.equal(results[0].normalizedTitle, 'バッハの旋律を夜に聴いたせいです。');
-  assert.equal(results[0].lyricSource, 'genius');
   assert.ok(results[0].evidenceUrl.includes('genius.com'));
 });
 
@@ -159,13 +156,11 @@ test('researchAlbum falls back to cleanedTitle when Genius returns no results', 
 
   const results = await researchAlbum({
     tracks,
-    albumName: 'Test',
     options: { geniusClient: mockClient, rateLimitMs: 0 },
   });
 
   // cleanTitle keeps halfwidth parens; no Genius result → kept as-is
   assert.equal(results[0].normalizedTitle, 'バッハの旋律を夜に聴いたせいです(DJ版)');
-  assert.equal(results[0].lyricSource, null);
   assert.ok(results[0].notes[0].includes('No Genius match'));
 });
 
@@ -178,7 +173,6 @@ test('researchAlbum gracefully handles Genius errors', async () => {
 
   const results = await researchAlbum({
     tracks,
-    albumName: 'Test',
     options: { geniusClient: mockClient, rateLimitMs: 0 },
   });
 
@@ -204,7 +198,7 @@ test('researchAlbum search query includes artist prefix', async () => {
 
   await researchAlbum({
     tracks,
-    albumName: 'Test',
+    artist: 'サカナクション',
     options: { geniusClient: mockClient, rateLimitMs: 0 },
   });
 
