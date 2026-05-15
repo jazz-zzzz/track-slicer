@@ -9,11 +9,12 @@
 ```
 album-extractor/           ← git 仓库根（即本目录）
 ├── SKILL.md               ← skill 定义，AI agent 的行为契约
-├── tool.js                ← CLI 入口（manifest / build 两个命令）
+├── tool.js                ← CLI 入口（manifest / build / lyrics 三个命令）
 ├── src/                   ← 核心模块
 │   ├── build-album.js     # 并行构建（10-worker pool，FLAC + ALAC/refalac）
 │   ├── discover-album.js  # 自动发现专辑目录结构
 │   ├── ffmpeg.js          # ffmpeg/refalac 命令构建
+│   ├── lyrics.js          # 歌词获取（网易云API + Genius备用 + LRC转纯文本）
 │   ├── manifest.js        # manifest 读写
 │   ├── parse-timestamps.js# 时间戳 markdown 解析
 │   ├── normalize.js       # 标题标准化（去翻译、MC 检测）

@@ -29,6 +29,8 @@ Split concert/live recordings into album tracks. AI handles research and normali
 4. BUILD    → `node tool.js build --manifest <path> --no-flac`
               Add `--use-refalac` for 96kHz or chapter-heavy sources.
               After build: offer to move ALAC to Apple Music.
+5. LYRICS   → `node tool.js lyrics --manifest <path>` fetches from Netease.
+              Add `--embed` to write lyrics into audio file metadata (ALAC/FLAC).
 ```
 
 ## Core Principles
@@ -40,7 +42,7 @@ Split concert/live recordings into album tracks. AI handles research and normali
 
 ## Key Rules
 
-- **Lyrics are OFF by default.** Only fetch lyrics if the user explicitly requests it. Max 5 tracks per batch.
+- **Lyrics from Netease Cloud Music.** Primary source via `music.163.com` API. Genius as fallback (requires proxy). `lyricSource` records origin; credits (作词/作曲/编曲) are auto-stripped. Use `--embed` to write lyrics into audio metadata.
 - **Batch research.** Search for official setlist first. If not found, cross-reference with studio album tracklists. Only search individually as last resort.
 - **Show diff, not full JSON.** Use `summary` command for review. Only show changed/needs_review tracks.
 - **`normalizationStatus` and `trackKind`** fields carry state — use them instead of natural language explanations.
@@ -53,6 +55,7 @@ Split concert/live recordings into album tracks. AI handles research and normali
 node tool.js manifest <album-dir> [--artist <name>]           # generate draft manifest
 node tool.js summary --manifest <manifest.json>               # show review summary (diff only)
 node tool.js build --manifest <manifest.json> [--no-flac] [--use-refalac]  # split & encode
+node tool.js lyrics --manifest <manifest.json> [--embed]      # fetch lyrics from Netease
 ```
 
 ## Limits
