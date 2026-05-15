@@ -258,9 +258,12 @@ async function runLyrics(manifestPath) {
   const manifest = readManifest(manifestPath);
   const baseDir = path.dirname(manifestPath);
 
-  const songs = (manifest.tracks || []).filter(
-    (t) => t.trackKind === 'song' && t.normalizedTitle && !t.lyricPath
-  );
+  const songs = (manifest.tracks || []).filter((t) => {
+    if (t.lyricPath) return false;
+    if (t.trackKind === 'mc' || t.trackKind === 'intro' || t.isNonMusic) return false;
+    if (!t.normalizedTitle) return false;
+    return true;
+  });
 
   if (songs.length === 0) {
     console.log('No tracks need lyrics.');
