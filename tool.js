@@ -254,7 +254,7 @@ async function runLyrics(manifestPath) {
   const manifest = readManifest(manifestPath);
   const baseDir = path.dirname(manifestPath);
 
-  const songs = manifest.tracks.filter(
+  const songs = (manifest.tracks || []).filter(
     (t) => t.trackKind === 'song' && t.normalizedTitle && !t.lyricPath
   );
 
