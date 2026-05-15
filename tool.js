@@ -10,6 +10,7 @@ const { cleanTitle, isNonMusicTrack } = require('./src/normalize');
 const { buildAlbum } = require('./src/build-album');
 const { verifyOutput } = require('./src/verify');
 const { formatError } = require('./src/errors');
+const { fetchLyricsForTrack } = require('./src/lyrics');
 
 // ── argument parsing ──
 
@@ -17,7 +18,7 @@ const raw = process.argv.slice(2);
 
 const commandIdx = raw.findIndex((a) => !a.startsWith('-'));
 if (commandIdx === -1) {
-  console.error('Usage: node tool.js <manifest|build|summary> [options]');
+  console.error('Usage: node tool.js <manifest|build|summary|lyrics> [options]');
   process.exit(1);
 }
 const command = raw[commandIdx];
@@ -42,9 +43,9 @@ for (let i = 0; i < rest.length; i++) {
   }
 }
 
-const validCommands = new Set(['manifest', 'build', 'summary']);
+const validCommands = new Set(['manifest', 'build', 'summary', 'lyrics']);
 if (!validCommands.has(command)) {
-  console.error('Usage: node tool.js <manifest|build|summary> [options]');
+  console.error('Usage: node tool.js <manifest|build|summary|lyrics> [options]');
   process.exit(1);
 }
 
@@ -247,6 +248,69 @@ async function runBuild(manifestPath) {
   if (!summary.ok) process.exit(1);
 }
 
+// ── lyrics ──
+
+async function runLyrics(manifestPath) {
+  const manifest = readManifest(manifestPath);
+  const baseDir = path.dirname(manifestPath);
+
+  const songs = manifest.tracks.filter(
+    (t) => t.trackKind === 'song' && t.normalizedTitle && !t.lyricPath
+  );
+
+  if (songs.length === 0) {
+    console.log('No tracks need lyrics.');
+    return;
+  }
+
+  const lyricsDir = path.join(baseDir, 'lyrics');
+  fs.mkdirSync(lyricsDir, { recursive: true });
+
+  console.log(`Fetching lyrics for ${songs.length} tracks from Netease…`);
+  let ok = 0;
+  let failed = 0;
+
+  for (const track of songs) {
+    const prefix = String(track.number).padStart(2, '0');
+    process.stdout.write(`  ${prefix} ${track.normalizedTitle} ... `);
+
+    try {
+      const result = await fetchLyricsForTrack(
+        manifest.artist,
+        track.lyricLookupTitle || track.normalizedTitle
+      );
+
+      if (result && result.text) {
+        const safeTitle = track.normalizedTitle.replace(/[<>:"/\\|?*]/g, '_');
+        const filename = `${prefix}-${safeTitle}.txt`;
+        const filePath = path.join(lyricsDir, filename);
+        fs.writeFileSync(filePath, result.text, 'utf8');
+
+        track.lyricSource = result.source;
+        track.lyricPath = `lyrics/${filename}`;
+
+        console.log(`OK (${result.source}, ${result.text.split('\n').length} lines)`);
+        ok++;
+      } else {
+        track.lyricSource = 'not_found';
+        track.lyricPath = null;
+        console.log('NOT FOUND');
+        failed++;
+      }
+    } catch (err) {
+      track.lyricSource = 'not_found';
+      track.lyricPath = null;
+      console.log(`ERROR: ${err.message}`);
+      failed++;
+    }
+
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+
+  writeManifest(manifestPath, manifest);
+  console.log(`\nDone: ${ok} fetched, ${failed} not found. Manifest updated.`);
+}
+
 // ── dispatch ──
 
 try {
@@ -283,6 +347,14 @@ try {
   } else if (command === 'summary') {
     const manifestPath = params.manifest || path.join(positional[0] || '.', 'manifest.json');
     runSummary(path.isAbsolute(manifestPath) ? manifestPath : path.resolve(manifestPath));
+  } else if (command === 'lyrics') {
+    const manifestPath = params.manifest || path.join(positional[0] || '.', 'manifest.json');
+    runLyrics(
+      path.isAbsolute(manifestPath) ? manifestPath : path.resolve(manifestPath)
+    ).catch((error) => {
+      console.error(error.message);
+      process.exit(1);
+    });
   }
 } catch (error) {
   console.error(error.message);
