@@ -258,8 +258,8 @@ async function runBuild(manifestPath) {
 // ── lyrics ──
 
 async function embedLyricsInFile(trackPath, lyrics) {
-  const tmpPath = trackPath + '.tmp';
   const ext = path.extname(trackPath).toLowerCase();
+  const tmpPath = trackPath.replace(new RegExp(ext + '$'), '.embed' + ext);
 
   return new Promise((resolve, reject) => {
     const args = ['-i', trackPath, '-c', 'copy', '-map', '0', '-metadata', `lyrics=${lyrics}`, tmpPath];
