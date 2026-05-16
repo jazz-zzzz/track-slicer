@@ -323,7 +323,7 @@ async function runLyrics(manifestPath, embed = false) {
 
         let embedStatus = '';
         if (embed) {
-          const embedText = result.ttlm || result.text;
+          const embedText = result.text;
           const alacDir = path.join(baseDir, 'ALAC');
           const flacDir = path.join(baseDir, 'tracks');
           for (const [dir, ext] of [[alacDir, 'm4a'], [flacDir, 'flac']]) {
