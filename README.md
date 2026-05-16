@@ -112,6 +112,7 @@ Four CLI commands, invoked by Claude Code on your behalf:
 - Video sources (.mkv, .mp4) supported — audio stream extracted via `-map 0:a`.
 - Requires `timestamps.md`. No timestamps = nothing to split.
 - Lyrics fetched from Netease Cloud Music on request. `--embed` writes them into audio metadata.
+- Apple Music displays custom-embedded lyrics as small-font static text. Full-screen synced (TTML) mode is exclusive to official Apple Music catalog content — a platform limitation, not a tool shortcoming.
 
 ## License
 

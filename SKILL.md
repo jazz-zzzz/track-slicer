@@ -42,7 +42,7 @@ Split concert/live recordings into album tracks. AI handles research and normali
 
 ## Key Rules
 
-- **Lyrics from Netease Cloud Music.** Primary source via `music.163.com` API. Genius as fallback (requires proxy). `lyricSource` records origin; credits (作词/作曲/编曲) are auto-stripped. Use `--embed` to write lyrics into audio metadata.
+- **Lyrics from Netease Cloud Music.** Primary source via `music.163.com` API. Genius as fallback (requires proxy). `lyricSource` records origin; credits (作词/作曲/编曲) are auto-stripped. Use `--embed` to write lyrics into audio `©lyr` metadata. Apple Music shows custom-embedded lyrics as small-font static text; full-screen TTML sync is Apple-catalog-exclusive (platform limitation, verified).
 - **Batch research.** Search for official setlist first. If not found, cross-reference with studio album tracklists. Only search individually as last resort.
 - **Show diff, not full JSON.** Use `summary` command for review. Only show changed/needs_review tracks.
 - **`normalizationStatus` and `trackKind`** fields carry state — use them instead of natural language explanations.
