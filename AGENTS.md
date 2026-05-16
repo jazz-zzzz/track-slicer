@@ -27,6 +27,7 @@ User data (`albums/`) lives at `../albums/` — outside version control.
 - `npm test` — run all tests
 - `node tool.js manifest <album-dir>` — generate manifest
 - `node tool.js build --manifest <path>` — split & encode
+- `node tool.js lyrics --manifest <path> [--embed]` — fetch lyrics from Netease
 
 ## Junction setup
 
