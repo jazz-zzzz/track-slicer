@@ -3,7 +3,7 @@ name: track-slicer
 description: Use when the user has a concert/live audio or video file with fuzzy timestamps and wants to split it into a clean, normalized album with cover art — for Apple Music (ALAC) or personal archive (FLAC). Triggers on requests like "split this concert", "extract tracks from this live", "make an album from this recording", or when the user provides timestamps.md alongside a concert source file.
 ---
 
-# Album Extractor
+# Track Slicer
 
 Split concert/live recordings into album tracks. AI handles research and normalization; CLI handles deterministic split/encode. The manifest is the contract. Detailed reference: `docs/reference.md`.
 
