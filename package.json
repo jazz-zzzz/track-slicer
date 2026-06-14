@@ -1,5 +1,5 @@
 {
-  "name": "album-extractor",
+  "name": "track-slicer",
   "version": "1.0.0",
   "description": "Split concert/live recordings into clean, properly-named album tracks with cover art — for Apple Music (ALAC) or personal archive (FLAC)",
   "main": "tool.js",

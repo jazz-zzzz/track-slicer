@@ -2,12 +2,12 @@
 
 ## 项目定位
 
-本仓库是 `album-extractor` Claude Code skill 的规范源。代码通过 Windows junction 链接到 `~/.claude/skills/album-extractor/`，git 更新即 skill 自动同步。
+本仓库是 `track-slicer` Claude Code skill 的规范源。代码通过 Windows junction 链接到 `~/.claude/skills/track-slicer/`，git 更新即 skill 自动同步。
 
 ## 目录结构
 
 ```
-album-extractor/           ← git 仓库根（即本目录）
+track-slicer/           ← git 仓库根（即本目录）
 ├── SKILL.md               ← skill 定义，AI agent 的行为契约
 ├── tool.js                ← CLI 入口（manifest / build / lyrics 三个命令）
 ├── src/                   ← 核心模块
@@ -27,13 +27,13 @@ album-extractor/           ← git 仓库根（即本目录）
 ## Junction 架构
 
 ```
-~/.claude/skills/album-extractor/  → (junction)  →  <repo>/album-extractor/
+~/.claude/skills/track-slicer/  → (junction)  →  <repo>/track-slicer/
 ```
 
 删除旧 junction 并重建：
 ```powershell
-cmd /c rmdir "$env:USERPROFILE\.claude\skills\album-extractor"
-New-Item -Path "$env:USERPROFILE\.claude\skills\album-extractor" -ItemType Junction -Target "<repo>\album-extractor"
+cmd /c rmdir "$env:USERPROFILE\.claude\skills\track-slicer"
+New-Item -Path "$env:USERPROFILE\.claude\skills\track-slicer" -ItemType Junction -Target "<repo>\track-slicer"
 ```
 
 ## 关键约定

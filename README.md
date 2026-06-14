@@ -7,8 +7,8 @@ A [Claude Code](https://claude.ai/code) skill that splits concert recordings int
 ## Install
 
 ```bash
-git clone https://github.com/jazz-zzzz/album-extractor.git
-cd album-extractor
+git clone https://github.com/jazz-zzzz/track-slicer.git
+cd track-slicer
 npm install
 ```
 
@@ -17,10 +17,10 @@ npm install
 Junction into Claude Code:
 
 ```powershell
-cmd /c rmdir "$env:USERPROFILE\.claude\skills\album-extractor"
+cmd /c rmdir "$env:USERPROFILE\.claude\skills\track-slicer"
 New-Item -ItemType Junction `
-  -Path "$env:USERPROFILE\.claude\skills\album-extractor" `
-  -Target "<your-clone-path>\album-extractor"
+  -Path "$env:USERPROFILE\.claude\skills\track-slicer" `
+  -Target "<your-clone-path>\track-slicer"
 ```
 
 `git pull` updates the skill automatically. Verify with `npm test`.

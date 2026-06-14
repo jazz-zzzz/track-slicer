@@ -5,8 +5,8 @@
 ## 开发
 
 ```bash
-git clone https://github.com/jazz-zzzz/album-extractor.git
-cd album-extractor
+git clone https://github.com/jazz-zzzz/track-slicer.git
+cd track-slicer
 npm install
 npm test
 ```
@@ -35,4 +35,4 @@ node --test tests/smoke.test.js  # 仅冒烟测试
 
 ## 问题反馈
 
-[GitHub Issues](https://github.com/jazz-zzzz/album-extractor/issues)
+[GitHub Issues](https://github.com/jazz-zzzz/track-slicer/issues)
